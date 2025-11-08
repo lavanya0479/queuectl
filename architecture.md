@@ -1,88 +1,107 @@
-Got it 👍 — you already have your `README.md`, so here’s a **short, clean version** of `architecture.md` — simple, focused, and perfect for your repo (no extra fluff).
 
-Just copy-paste this as your `architecture.md` file 👇
+# 🧠 QueueCTL – Architecture & Design
 
----
+## 1️⃣ Overview
 
-```markdown
-# 🧠 QueueCTL – Architecture Overview
+QueueCTL is a Node.js-based command-line job queue system that manages and executes background jobs reliably.  
+It supports **persistent job storage**, **multi-worker concurrency**, **automatic retries**, **exponential backoff**, and a **Dead Letter Queue (DLQ)**.
 
-## Overview
-QueueCTL is a Node.js CLI-based job queue system built with **SQLite** for persistence.  
-It supports **multiple workers**, **automatic retries**, **exponential backoff**, and a **Dead Letter Queue (DLQ)**.  
-Jobs survive restarts and can be safely reprocessed.
+The system focuses on reliability and simplicity — ensuring that every job is processed exactly once and no data is lost even if the system restarts.
 
 ---
 
-## Core Components
+## 2️⃣ Core Workflow
 
-### Database
-SQLite is used for job and config storage.
-- **jobs** table stores each job’s state, retry count, and timestamps.
-- **config** table stores system-wide settings (e.g., backoff_base, default_max_retries).
+1. **Job Enqueueing**
+   - Jobs are added via CLI as JSON (e.g., `{"command": "echo hello"}`).
+   - Each job gets a unique ID and is stored in SQLite with state `pending`.
 
-### Main Modules
-- **Enqueue** → Adds new jobs to queue (`pending` state)
-- **Worker** → Picks jobs atomically, executes commands, updates state
-- **DLQ** → Holds failed jobs after max retries
-- **Config** → Stores runtime parameters
-- **Status/List** → CLI view for job progress
+2. **Worker Operation**
+   - Workers continuously poll for jobs in the `pending` state.
+   - Job selection and state change (`pending → processing`) happen atomically in a database transaction.
+   - Jobs are executed using Node’s `spawnSync()` to ensure synchronous completion before marking them done.
 
----
-
-## Job Lifecycle
+3. **State Transitions**
 ```
 
-pending → processing → (completed | retry → pending | dead)
+pending → processing → completed
+↘
+(failed)
+↘
+retry → pending → completed
+↘
+(max retries)
+↘
+dead (DLQ)
 
-```
+````
 
-- Success → marked `completed`
-- Failure → retried with `delay = base ^ attempts`
-- After max retries → moves to `dead` (DLQ)
+4. **Failure & Retry Logic**
+- Failed jobs are retried with exponential backoff:
+  ```
+  delay = backoff_base ^ attempts
+  ```
+- After reaching `max_retries`, the job moves to the **dead** state.
 
----
-
-## Worker Model
-- Multiple workers run concurrently via:
-```
-
-node queuectl.js worker start --count N
-
-```
-- Each worker:
-- Claims one pending job (`UPDATE ... WHERE state='pending'`)
-- Executes command (`spawnSync`)
-- Updates DB state on success/failure
-- On startup, recovers stuck `processing` jobs to `pending`
-- On shutdown (SIGTERM/SIGINT), finishes current job before exiting
-
----
-
-## Reliability Features
-- **Atomic DB updates** prevent duplicate execution  
-- **Auto recovery** resets stuck jobs  
-- **Graceful shutdown** ensures clean exits  
-- **Persistent DB** means jobs are never lost  
+5. **Dead Letter Queue (DLQ)**
+- Stores jobs that failed after all retries.
+- You can requeue a DLQ job using:
+  ```
+  node queuectl.js dlq retry <jobid>
+  ```
 
 ---
 
-## Extensibility
-Easily extendable for:
-- Job timeouts  
-- Priorities  
-- Scheduled (`run_at`) jobs  
-- Job output logging  
-- Web or metrics dashboard  
+## 3️⃣ Database Model
+
+**SQLite** is used for persistence.  
+It keeps job data consistent across restarts with `WAL` mode for safe concurrency.
+
+### Tables
+
+**jobs**
+| Column | Type | Purpose |
+|---------|------|----------|
+| id | TEXT | Unique job ID |
+| command | TEXT | Shell command to execute |
+| state | TEXT | Job state (pending, processing, completed, dead) |
+| attempts | INTEGER | Retry counter |
+| max_retries | INTEGER | Max allowed retries |
+| created_at | TEXT | Creation timestamp |
+| updated_at | TEXT | Last state change |
+| available_at | TEXT | When job is next eligible to run |
+| last_error | TEXT | Last failure reason |
+
+**config**
+| Key | Value |
+|-----|--------|
+| backoff_base | Retry backoff multiplier |
+| default_max_retries | Default retry limit |
 
 ---
 
-**Developed by:** *Sai Lavanya*  
-*QueueCTL Internship Submission*
-```
+## 5️⃣ Design Decisions & Trade-offs
+
+| Design Choice                | Reason                                                             |
+| ---------------------------- | ------------------------------------------------------------------ |
+| **SQLite storage**           | Lightweight, persistent, transactional DB suitable for local queue |
+| **spawnSync**                | Guarantees a job finishes before DB update (no async race)         |
+| **Multi-process workers**    | True OS-level parallelism with isolation                           |
+| **CLI-based management**     | Simplifies debugging and control                                   |
+| **No external dependencies** | Keeps setup minimal and portable                                   |
 
 ---
 
-✅ This version is **concise, professional, and readable** — perfect for your internship repo.
+## 6️⃣ Future Improvements
 
-Would you like a short 1-line GitHub **repository description and topic tags** next (for the repo header)?
+Future extensions can include:
+
+* Job **timeouts** (auto-fail after X seconds)
+* **Priority** queues
+* **Scheduled** or delayed jobs (`run_at`)
+* Job **output logging**
+* **Metrics** or simple web dashboard
+
+
+
+
