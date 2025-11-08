@@ -1,10 +1,4 @@
-Perfect 👍 — here’s the **final, polished version of your `README.md`** file, formatted cleanly for GitHub and ready for **copy-paste**.
 
-Just copy **everything below**, paste it into your `README.md`, save, and push it to GitHub 👇
-
----
-
-````markdown
 # 🧩 QueueCTL – CLI Job Queue with Workers, Retries, Backoff & DLQ
 
 **QueueCTL** is a Node.js CLI-based job queue system that supports:
@@ -24,11 +18,8 @@ Just copy **everything below**, paste it into your `README.md`, save, and push i
 - **npm packages**:  
   ```bash
   npm install commander better-sqlite3 uuid
-````
 
----
-
-## 🚀 Usage
+##  Usage
 
 ### Enqueue a Job
 
@@ -95,29 +86,66 @@ node queuectl.js status
 
 ## 🧠 Architecture Overview
 
-See [architecture.md](architecture.md) for internal design details.
+QueueCTL is built on a simple, reliable architecture powered by **SQLite** and Node.js.
+Each worker process:
+
+* Claims a pending job atomically using SQL transactions
+* Executes it synchronously via `spawnSync`
+* Updates job state (`completed`, `retry`, or `dead`)
+* On startup, recovers any stuck jobs (`processing → pending`)
+* On shutdown, finishes current job before exit
+
+For detailed workflow, see [architecture.md](architecture.md).
 
 ---
 
-## 🧪 Example Workflow
+## 🧩 Assumptions & Trade-offs
 
-```powershell
-# Clean start
-Remove-Item queuectl.db -Force -ErrorAction SilentlyContinue
+* **SQLite** chosen for simplicity, persistence, and ACID transactions.
+* **spawnSync** ensures jobs finish before status updates (no race conditions).
+* Focused on **local reliability**, not distributed scalability.
+* Assumes each job command is an independent shell command.
+* Communication between workers happens **only through the database**.
+* Prioritizes **simplicity and maintainability** over complex orchestration.
 
-# Enqueue jobs
-node --% queuectl.js enqueue "{\"id\":\"success1\",\"command\":\"echo OK\"}"
-node --% queuectl.js enqueue "{\"id\":\"fail1\",\"command\":\"exit 2\",\"max_retries\":1}"
+---
 
-# Start worker
-node queuectl.js worker start
-Start-Sleep -Seconds 3
-node queuectl.js worker stop
+## 🧪 Testing Instructions
 
-# Check results
-node queuectl.js status
-node queuectl.js dlq list
-```
+Follow these steps to verify QueueCTL functionality:
+
+1. **Clean start**
+
+   ```powershell
+   Remove-Item queuectl.db -Force -ErrorAction SilentlyContinue
+   ```
+
+2. **Enqueue jobs**
+
+   ```powershell
+   node --% queuectl.js enqueue "{\"id\":\"success1\",\"command\":\"echo OK\"}"
+   node --% queuectl.js enqueue "{\"id\":\"fail1\",\"command\":\"exit 2\",\"max_retries\":1}"
+   ```
+
+3. **Start multiple workers**
+
+   ```powershell
+   node queuectl.js worker start --count 4
+   Start-Sleep -Seconds 5
+   node queuectl.js worker stop
+   ```
+
+4. **Check status**
+
+   ```powershell
+   node queuectl.js status
+   node queuectl.js dlq list
+   ```
+
+✅ Expected Results:
+
+* `success1` → **completed**
+* `fail1` → **dead (in DLQ)**
 
 ---
 
@@ -129,18 +157,6 @@ node queuectl.js dlq list
 * Graceful shutdown with SIGTERM/SIGINT handling
 * DLQ management with retry support
 * Self-healing for stuck `processing` jobs on restart
-
----
-
-## 🌟 Bonus-Ready (Extensible)
-
-The system is designed to easily extend with:
-
-* Job timeouts
-* Priority queues
-* Scheduled (`run_at`) jobs
-* Job output logging
-* Metrics or web dashboard
 
 ---
 
@@ -156,36 +172,10 @@ The system is designed to easily extend with:
 
 ## 🎥 Demo
 
-Include your Drive/GitHub video link here:
-
+Include your video demo link here:
 📹 [Demo Video Link](https://your-google-drive-demo-link-here)
 
----
-
-## 🧾 Submission Checklist
-
-* [x] Working CLI commands
-* [x] Jobs persist across restarts
-* [x] Retry & backoff implemented
-* [x] DLQ functional
-* [x] Configurable via CLI
-* [x] Multi-worker support tested
-* [x] Graceful shutdown + recovery
-* [x] Comprehensive README & architecture file
 
 ---
 
-**Developed by:** *Sai Lavanya*
-*QueueCTL Internship Submission*
 
-```
-
----
-
-✅ That’s it — this is your **final `README.md`**.  
-Once you commit and push it to GitHub, your repository will be *submission-ready and professionally formatted.*
-
-Would you like me to also give you the short **GitHub repo tagline and topics** (the one-liner under the repo name + recommended tags)?  
-Example:  
-> “CLI-based job queue system with multi-worker concurrency, retries, and DLQ — built in Node.js”
-```
