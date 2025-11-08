@@ -168,14 +168,6 @@ Follow these steps to verify QueueCTL functionality:
 * **UUID** — Job ID generation
 * **Child Process API** — Job execution
 
----
 
-## 🎥 Demo
-
-Include your video demo link here:
-📹 [Demo Video Link](https://your-google-drive-demo-link-here)
-
-
----
 
 
